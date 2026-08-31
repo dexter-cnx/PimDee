@@ -23,7 +23,7 @@ export function WorkspaceRoot() {
   const thai = i18n.language.startsWith('th')
 
   useEffect(() => {
-    getStatsAdapter().getResults('local-user').then((results) => setHasRecordedPractice(results.length > 0)).catch(() => setHasRecordedPractice(false))
+    getStatsAdapter().getResults('guest').then((results) => setHasRecordedPractice(results.length > 0)).catch(() => setHasRecordedPractice(false))
     const sync = () => setWorkspace(fromHash())
     window.addEventListener('hashchange', sync)
     return () => window.removeEventListener('hashchange', sync)
