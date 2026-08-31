@@ -37,11 +37,15 @@ export const KEYS: KeyDef[][] = [
 
 export type KeyInput = Pick<KeyboardEvent, 'key' | 'shiftKey' | 'metaKey' | 'ctrlKey' | 'altKey'>
 
-export function normalizeInput(event: KeyInput, language: Lang): string | null {
+function expectsAscii(char?: string) {
+  return Boolean(char && /^[\x20-\x7E]$/.test(char))
+}
+
+export function normalizeInput(event: KeyInput, language: Lang, expectedChar?: string): string | null {
   if (event.key === 'Backspace') return 'BACKSPACE'
   if (event.key === 'Tab' || event.key === 'Enter' || event.metaKey || event.ctrlKey || event.altKey) return null
   if (event.key.length !== 1) return null
-  if (language === 'EN') return event.key
+  if (language === 'EN' || expectsAscii(expectedChar)) return event.key
   const lower = event.key.toLowerCase()
   if (/^[a-z]$/.test(lower) || Object.prototype.hasOwnProperty.call(TH_MAP, lower)) {
     if (event.shiftKey && TH_SHIFT_MAP[lower]) return TH_SHIFT_MAP[lower]
@@ -53,7 +57,7 @@ export function normalizeInput(event: KeyInput, language: Lang): string | null {
 export function equivalentKeyForChar(char: string, language: Lang): string | null {
   if (!char) return null
   if (char === ' ') return ' '
-  if (language === 'EN') return char.toLowerCase()
+  if (language === 'EN' || /^[\x20-\x7E]$/.test(char)) return char.toLowerCase()
   const direct = Object.entries(TH_MAP).find(([, value]) => value === char)
   if (direct) return direct[0]
   return Object.entries(TH_SHIFT_MAP).find(([, value]) => value === char)?.[0] ?? null

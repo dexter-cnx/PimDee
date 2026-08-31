@@ -3,14 +3,14 @@ app.title,PimDee - พิมพ์ดี,PimDee - พิมพ์ดี
 app.subtitle,Thai Kedmanee + English QWERTY touch typing,ฝึกพิมพ์สัมผัสไทยเกษมณี + English QWERTY
 layout.kedmanee,Kedmanee TIS,เกษมณี มอก.
 sidebar.lessons,Lessons,บทเรียน
-sidebar.lessonCount,6 lessons,6 บท
+sidebar.lessonCount,36 lessons,36 บท
 sidebar.tipTitle,Core principle,หลักสำคัญ
 sidebar.tipBody,Reach 95%+ accuracy before chasing WPM and always return to the home row.,พิมพ์ให้แม่น 95%+ ก่อนเร่ง WPM และพยายามกลับนิ้วมาที่แถวเหย้าทุกครั้ง
 metric.accuracy,Accuracy,แม่นยำ
 metric.time,Time,เวลา
 practice.lesson,Lesson,บทที่
-practice.customTitle,Custom text,ข้อความกำหนดเอง
-practice.customSubtitle,Practice your own text,ฝึกจากข้อความที่คุณวางเอง
+practice.customTitle,Custom practice,ฝึกข้อความเอง
+practice.customSubtitle,Optional practice with your own text,แบบฝึกเสริมจากข้อความของคุณ
 mode.natural,Natural,ธรรมชาติ
 mode.forced,Forced,บังคับแก้
 practice.focusHint,"Click here, then start typing",คลิกบริเวณนี้แล้วเริ่มพิมพ์
@@ -19,8 +19,10 @@ status.wrong,Mistakes,พลาด
 status.forced,Correct the error before continuing,ผิดแล้วต้องแก้ก่อน
 status.natural,Continue after an error,ผิดแล้วไปต่อได้
 custom.title,Custom text,ข้อความกำหนดเอง
+custom.open,Custom text,ข้อความกำหนดเอง
+custom.close,Close custom text,ปิดข้อความกำหนดเอง
 custom.placeholder,Paste Thai or English text to practice...,วางข้อความไทยหรืออังกฤษที่อยากฝึก...
-custom.useLesson,Use lesson,กลับบทเรียน
+custom.useLesson,Back to lesson,กลับบทเรียน
 custom.practice,Practice this text,เริ่มฝึกข้อความนี้
 result.complete,Lesson complete,จบบทแล้ว
 result.mistakes,mistakes,ครั้งที่พลาด
@@ -48,6 +50,7 @@ tooltip.lesson,Open this lesson,เลือกฝึกบทเรียนน
 tooltip.natural,Errors are recorded but typing continues,พิมพ์ผิดแล้วบันทึกความผิดพลาดแต่ไปต่อได้
 tooltip.forced,You must correct an error before continuing,พิมพ์ผิดแล้วต้องแก้ก่อนจึงไปต่อได้
 tooltip.reset,Restart the current practice,เริ่มการฝึกปัจจุบันใหม่
+tooltip.customText,Open optional custom-text practice,เปิดแบบฝึกเสริมจากข้อความกำหนดเอง
 tooltip.useLesson,Return to the selected lesson,กลับไปใช้ข้อความจากบทเรียนที่เลือก
 tooltip.practiceCustom,Start practicing the custom text,เริ่มฝึกจากข้อความที่กำหนดเอง
 tooltip.retry,Restart with the same text,เริ่มฝึกข้อความเดิมอีกครั้ง
@@ -55,3 +58,9 @@ tooltip.nextLesson,Continue to the next lesson,ไปยังบทเรีย
 tooltip.key,Physical key {{key}} types {{char}},ปุ่มจริง {{key}} ใช้พิมพ์ {{char}}
 error.title,Something went wrong,เกิดข้อผิดพลาด
 error.body,Reload the page and try again.,โหลดหน้าใหม่แล้วลองอีกครั้ง
+learning.mastered,Mastered,ผ่านแล้ว
+learning.locked,Complete the previous lesson first,ผ่านบทก่อนหน้าเพื่อปลดล็อก
+learning.best,Best,สถิติดีสุด
+learning.goal,Goal,เป้าหมาย
+learning.adaptive,Practice weak keys,ฝึกจุดที่พลาด
+learning.adaptiveHint,Build a short drill from your most frequent mistakes,สร้างแบบฝึกสั้นจากตัวที่พลาดบ่อย
