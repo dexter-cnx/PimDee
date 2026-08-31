@@ -55,3 +55,9 @@ tooltip.nextLesson,Continue to the next lesson,ไปยังบทเรีย
 tooltip.key,Physical key {{key}} types {{char}},ปุ่มจริง {{key}} ใช้พิมพ์ {{char}}
 error.title,Something went wrong,เกิดข้อผิดพลาด
 error.body,Reload the page and try again.,โหลดหน้าใหม่แล้วลองอีกครั้ง
+learning.mastered,Mastered,ผ่านแล้ว
+learning.locked,Complete the previous lesson first,ผ่านบทก่อนหน้าเพื่อปลดล็อก
+learning.best,Best,สถิติดีสุด
+learning.goal,Goal,เป้าหมาย
+learning.adaptive,Practice weak keys,ฝึกจุดที่พลาด
+learning.adaptiveHint,Build a short drill from your most frequent mistakes,สร้างแบบฝึกสั้นจากตัวที่พลาดบ่อย
