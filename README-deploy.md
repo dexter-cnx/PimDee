@@ -1,49 +1,31 @@
-# PimDee - พิมพ์ดี | Deploy Guide
+# PimDee deployment
 
-## Storage Adapter
+PimDee is a static Vite/React application deployed by GitHub Actions to GitHub Pages.
 
-PimDee runs without a backend by default.
-
-- `src/adapters/stats-adapter.ts` - contract
-- `src/adapters/local-adapter.ts` - default, offline-capable LocalStorage implementation
-- `src/adapters/firebase-adapter.ts` - Firebase stub for a later phase
-- `src/adapters/supabase-adapter.ts` - Supabase stub for a later phase
-
-Select with `.env`:
-
-```env
-VITE_ADAPTER=local
-```
-
-Accepted values: `local`, `firebase`, `supabase`.
-
-## Install and verify
+## Local verification
 
 ```bash
 npm install
+npm run check:l10n
+npm run typecheck
+npm test
 npm run build
 ```
 
-## GitHub Pages
+The Vite base path is `/PimDee/`, matching `https://dexter-cnx.github.io/PimDee/`.
 
-`vite.config.ts` already uses:
+## Localization workflow
 
-```ts
-base: '/PimDee/'
-```
-
-The repository deploy target is:
-
-`https://dexter-cnx.github.io/PimDee/`
-
-Manual deploy:
+`locales/locales.csv` is the single source of truth for interface copy. Do not edit `src/i18n/resources.generated.ts` directly.
 
 ```bash
-npm run deploy
+npm run gen:l10n
 ```
 
-For GitHub Actions deployment, configure Pages to use GitHub Actions and add a workflow that runs `npm ci`, `npm run build`, then publishes `dist/`.
+CI runs `npm run check:l10n` and fails when generated resources are stale. This mirrors a CSV-first localization workflow used by apps that generate per-language resources from one table.
 
-## Firebase / Supabase later
+## GitHub Pages
 
-Do not put service-role or server secrets in Vite environment variables. Only browser-safe public configuration belongs in `VITE_*` values. The Firebase and Supabase adapters are intentionally stubs until Auth/Cloud Sync phases.
+Repository Settings → Pages → Build and deployment must use **GitHub Actions**. Every push to `main` runs `.github/workflows/pages.yml`, verifies localization, typechecks, runs unit tests, builds `dist`, uploads the Pages artifact, and deploys it.
+
+No `gh-pages` package or manual deploy command is required.
