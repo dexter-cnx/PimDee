@@ -15,6 +15,12 @@ describe('lesson engine', () => {
     expect(lessonProgress(lesson, [result('L1', lesson.criteria.minAccuracy, lesson.criteria.minWpm)], 'TH').mastered).toBe(true)
     expect(lessonProgress(lesson, [result('L1', lesson.criteria.minAccuracy - 1, lesson.criteria.minWpm + 20)], 'TH').mastered).toBe(false)
   })
+  it('reports best accuracy and WPM from the same representative attempt', () => {
+    const lesson = LESSONS[0]
+    const progress = lessonProgress(lesson, [result('L1', 100, 5), result('L1', 90, 20)], 'TH')
+    expect([[100, 5], [90, 20]]).toContainEqual([progress.bestAccuracy, progress.bestWpm])
+    expect(progress.mastered).toBe(false)
+  })
   it('unlocks the next lesson after prerequisite mastery', () => {
     expect(isLessonUnlocked(LESSONS[1], LESSONS, [], 'TH')).toBe(false)
     expect(isLessonUnlocked(LESSONS[1], LESSONS, [result('L1', 100, 50)], 'TH')).toBe(true)
