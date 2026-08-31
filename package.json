@@ -6,6 +6,7 @@
   "homepage": "https://dexter-cnx.github.io/PimDee/",
   "scripts": {
     "dev": "vite",
+    "typecheck": "tsc --noEmit",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist"
