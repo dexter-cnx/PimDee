@@ -5,6 +5,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import './i18n'
 import './styles.css'
 import './curriculum.css'
+import './review-fixes.css'
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode><ErrorBoundary><App /></ErrorBoundary></React.StrictMode>,
