@@ -11,7 +11,7 @@ import { Metric } from './Metric'
 
 export function Phase2App({ challenge }: { challenge: 'race' | 'tones' }) {
   const { t, i18n } = useTranslation()
-  const [language, setLanguage] = useState<Lang>(challenge === 'tones' ? 'TH' : 'TH')
+  const [language, setLanguage] = useState<Lang>('TH')
   const [round, setRound] = useState(0)
   const [index, setIndex] = useState(0)
   const [states, setStates] = useState<TypingState[]>([])
@@ -23,6 +23,7 @@ export function Phase2App({ challenge }: { challenge: 'race' | 'tones' }) {
   const [saved, setSaved] = useState(false)
   const practiceRef = useRef<HTMLDivElement>(null)
   const isRace = challenge === 'race'
+  const thai = i18n.language.startsWith('th')
   const text = isRace ? raceText(language) : tonePrompt(round)
   const remaining = isRace ? Math.max(0, RACE_SECONDS - elapsed) : 0
   const { correctCount, wrongCount, accuracy, wpm } = calculateMetrics(states, Math.max(elapsed, 0.001))
@@ -75,19 +76,19 @@ export function Phase2App({ challenge }: { challenge: 'race' | 'tones' }) {
   }, [accuracy, finished, isRace, language, mistakes, saved, toneScore, wpm])
 
   const topMistakes = useMemo(() => Object.entries(mistakes).sort((a,b)=>b[1]-a[1]).slice(0,6), [mistakes])
-  const nextToneRound = () => { const next = round + 1; setRound(next); reset(next) }
+  const nextToneRound = () => setRound((value) => value + 1)
 
   return <div className="phase2-shell">
-    <header className="phase2-header"><div><div className="phase2-kicker">{t('phase2.badge')}</div><h1>{isRace ? t('race.title') : t('tone.title')}</h1><p>{isRace ? t('race.subtitle') : t('tone.subtitle')}</p></div>{isRace && <div className="segmented">{(['TH','EN'] as Lang[]).map((item)=><button key={item} className={language===item?'active':''} onClick={()=>setLanguage(item)}>{item}</button>)}</div>}</header>
+    <header className="phase2-header"><div><div className="phase2-kicker">Phase 2 Challenge</div><h1>{isRace ? (thai?'Race 60 วินาที':'60-second Race') : (thai?'ฝึกวรรณยุกต์':'Tone Mark Trainer')}</h1><p>{isRace ? (thai?'พิมพ์ต่อเนื่องหนึ่งนาที โดยรักษาสมดุลระหว่างความเร็วและความแม่น':'Type naturally for one minute and balance speed with accuracy.') : (thai?'ฝึกวรรณยุกต์ไทยด้วยคำและประโยคสั้นที่ใช้จริง':'Focus on Thai tone marks with short real-word rounds.')}</p></div>{isRace && <div className="segmented">{(['TH','EN'] as Lang[]).map((item)=><button key={item} className={language===item?'active':''} onClick={()=>setLanguage(item)}>{item}</button>)}</div>}</header>
     <main className="phase2-main">
-      <div className="metrics"><Metric label="WPM" value={wpm}/><Metric label={isRace?t('metric.accuracy'):t('tone.accuracy')} value={`${isRace?accuracy:toneScore}%`}/><Metric label={isRace?t('race.remaining'):t('tone.marks')} value={isRace?`${Math.ceil(remaining)}s`:countToneMarks(text)}/></div>
+      <div className="metrics"><Metric label="WPM" value={wpm}/><Metric label={isRace?t('metric.accuracy'):(thai?'แม่นยำวรรณยุกต์':'Tone accuracy')} value={`${isRace?accuracy:toneScore}%`}/><Metric label={isRace?(thai?'เหลือเวลา':'Remaining'):(thai?'วรรณยุกต์':'Tone marks')} value={isRace?`${Math.ceil(remaining)}s`:countToneMarks(text)}/></div>
       <section className={`practice card ${focused?'focused':''}`} ref={practiceRef} tabIndex={0} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}>
-        <div className="practice-head"><div><strong>{isRace?t('race.prompt'):`${t('tone.round')} ${round+1}`}</strong><small>{isRace?t('race.hint'):t('tone.hint')}</small></div><button className="icon-button" onClick={()=>reset()}>↻</button></div>
+        <div className="practice-head"><div><strong>{isRace?(thai?'ชาเลนจ์หนึ่งนาที':'One minute challenge'):`${thai?'รอบ':'Round'} ${round+1}`}</strong><small>{isRace?(thai?'โหมดธรรมชาติ · พิมพ์ผิดแล้วนับแต่ไปต่อได้':'Natural mode · errors count but you keep moving.'):(thai?'ดูวรรณยุกต์ให้ชัดแล้วกดปุ่มจริงให้ถูก':'Watch the tone mark and use the correct physical key.')}</small></div><button className="icon-button" onClick={()=>reset()}>↻</button></div>
         <div className="progress"><span style={{width:`${progress}%`}}/></div>
-        <div className="typing-area" onClick={()=>practiceRef.current?.focus()}>{!focused&&!finished&&<div className="focus-hint">⌨ {t('practice.focusHint')}</div>}<div className="typing-text">{text.split('').map((char,i)=><span key={`${i}-${char}`} className={`${states[i]??'pending'} ${i===index&&!finished?'cursor':''}`}>{char===' '?'\u00A0':char}</span>)}</div><div className="status-row"><span>{t('status.correct')} {correctCount}</span><span>{t('status.wrong')} {wrongCount}</span>{!isRace&&<span>{t('tone.focus')} ่ ้ ๊ ๋</span>}</div></div>
+        <div className="typing-area" onClick={()=>practiceRef.current?.focus()}>{!focused&&!finished&&<div className="focus-hint">⌨ {t('practice.focusHint')}</div>}<div className="typing-text">{text.split('').map((char,i)=><span key={`${i}-${char}`} className={`${states[i]??'pending'} ${i===index&&!finished?'cursor':''}`}>{char===' '?'\u00A0':char}</span>)}</div><div className="status-row"><span>{t('status.correct')} {correctCount}</span><span>{t('status.wrong')} {wrongCount}</span>{!isRace&&<span>{thai?'โฟกัส':'Focus'} ่ ้ ๊ ๋</span>}</div></div>
         <Keyboard language={language} expectedKey={expectedKey} mistakes={mistakes}/>
       </section>
-      {finished&&<section className="result card"><div className="result-title">✓ {isRace?t('race.complete'):t('tone.complete')}</div><p>{wpm} WPM · {isRace?accuracy:toneScore}% · {wrongCount} {t('result.mistakes')}</p><div className="heatmap-summary">{topMistakes.length===0?<span className="perfect">{t('result.perfect')}</span>:topMistakes.map(([char,count])=><span key={char}>{char} ×{count}</span>)}</div><div className="result-actions"><button className="secondary" onClick={()=>reset()}>{t('result.retry')}</button>{!isRace&&<button className="primary" onClick={nextToneRound}>{t('tone.next')}</button>}</div></section>}
+      {finished&&<section className="result card"><div className="result-title">✓ {isRace?(thai?'Race จบแล้ว':'Race complete'):(thai?'จบรอบแล้ว':'Round complete')}</div><p>{wpm} WPM · {isRace?accuracy:toneScore}% · {wrongCount} {t('result.mistakes')}</p><div className="heatmap-summary">{topMistakes.length===0?<span className="perfect">{t('result.perfect')}</span>:topMistakes.map(([char,count])=><span key={char}>{char} ×{count}</span>)}</div><div className="result-actions"><button className="secondary" onClick={()=>reset()}>{t('result.retry')}</button>{!isRace&&<button className="primary" onClick={nextToneRound}>{thai?'รอบถัดไป →':'Next round →'}</button>}</div></section>}
     </main>
   </div>
 }
