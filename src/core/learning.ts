@@ -3,13 +3,25 @@ import type { Lang, Lesson } from './types'
 
 export type LessonProgress = { attempts: number; bestAccuracy: number; bestWpm: number; mastered: boolean }
 
+function masteryScore(result: TypingResult, lesson: Lesson) {
+  const accuracyRatio = result.accuracy / lesson.criteria.minAccuracy
+  const wpmRatio = result.wpm / lesson.criteria.minWpm
+  return Math.min(accuracyRatio, wpmRatio)
+}
+
 export function lessonProgress(lesson: Lesson, results: TypingResult[], language: Lang): LessonProgress {
   const relevant = results.filter((r) => r.level === `L${lesson.id}` && r.language === language)
   const qualifying = relevant.filter((r) => r.accuracy >= lesson.criteria.minAccuracy && r.wpm >= lesson.criteria.minWpm)
+  const representative = [...relevant].sort((a, b) => {
+    const scoreDiff = masteryScore(b, lesson) - masteryScore(a, lesson)
+    if (scoreDiff !== 0) return scoreDiff
+    if (b.accuracy !== a.accuracy) return b.accuracy - a.accuracy
+    return b.wpm - a.wpm
+  })[0]
   return {
     attempts: relevant.length,
-    bestAccuracy: relevant.reduce((best, r) => Math.max(best, r.accuracy), 0),
-    bestWpm: relevant.reduce((best, r) => Math.max(best, r.wpm), 0),
+    bestAccuracy: representative?.accuracy ?? 0,
+    bestWpm: representative?.wpm ?? 0,
     mastered: qualifying.length >= lesson.criteria.attempts,
   }
 }
