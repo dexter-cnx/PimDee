@@ -12,8 +12,9 @@ const fromHash = (): Workspace => {
 }
 
 export function WorkspaceRoot() {
-  const { t } = useTranslation()
+  const { i18n } = useTranslation()
   const [workspace, setWorkspace] = useState<Workspace>(fromHash)
+  const thai = i18n.language.startsWith('th')
 
   useEffect(() => {
     const sync = () => setWorkspace(fromHash())
@@ -28,10 +29,10 @@ export function WorkspaceRoot() {
 
   return <>
     {workspace === 'lessons' ? <App /> : <Phase2App challenge={workspace} />}
-    <nav className="workspace-switcher" aria-label={t('phase2.navLabel')}>
-      <button className={workspace === 'lessons' ? 'active' : ''} onClick={() => select('lessons')}>{t('phase2.lessons')}</button>
-      <button className={workspace === 'race' ? 'active' : ''} onClick={() => select('race')}>{t('phase2.race')}</button>
-      <button className={workspace === 'tones' ? 'active' : ''} onClick={() => select('tones')}>{t('phase2.tones')}</button>
+    <nav className="workspace-switcher" aria-label={thai ? 'โหมดฝึก' : 'Practice modes'}>
+      <button className={workspace === 'lessons' ? 'active' : ''} onClick={() => select('lessons')}>{thai ? 'บทเรียน' : 'Lessons'}</button>
+      <button className={workspace === 'race' ? 'active' : ''} onClick={() => select('race')}>Race 60s</button>
+      <button className={workspace === 'tones' ? 'active' : ''} onClick={() => select('tones')}>{thai ? 'ฝึกวรรณยุกต์' : 'Tone Trainer'}</button>
     </nav>
   </>
 }
