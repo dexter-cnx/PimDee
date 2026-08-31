@@ -8,6 +8,7 @@ import './curriculum.css'
 import './review-fixes.css'
 import './phase2.css'
 import './dashboard.css'
+import './onboarding.css'
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode><ErrorBoundary><WorkspaceRoot /></ErrorBoundary></React.StrictMode>,
