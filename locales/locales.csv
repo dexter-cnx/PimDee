@@ -1,0 +1,57 @@
+key,en,th
+app.title,PimDee - พิมพ์ดี,PimDee - พิมพ์ดี
+app.subtitle,Thai Kedmanee + English QWERTY touch typing,ฝึกพิมพ์สัมผัสไทยเกษมณี + English QWERTY
+layout.kedmanee,Kedmanee TIS,เกษมณี มอก.
+sidebar.lessons,Lessons,บทเรียน
+sidebar.lessonCount,6 lessons,6 บท
+sidebar.tipTitle,Core principle,หลักสำคัญ
+sidebar.tipBody,Reach 95%+ accuracy before chasing WPM and always return to the home row.,พิมพ์ให้แม่น 95%+ ก่อนเร่ง WPM และพยายามกลับนิ้วมาที่แถวเหย้าทุกครั้ง
+metric.accuracy,Accuracy,แม่นยำ
+metric.time,Time,เวลา
+practice.lesson,Lesson,บทที่
+practice.customTitle,Custom text,ข้อความกำหนดเอง
+practice.customSubtitle,Practice your own text,ฝึกจากข้อความที่คุณวางเอง
+mode.natural,Natural,ธรรมชาติ
+mode.forced,Forced,บังคับแก้
+practice.focusHint,"Click here, then start typing",คลิกบริเวณนี้แล้วเริ่มพิมพ์
+status.correct,Correct,ถูก
+status.wrong,Mistakes,พลาด
+status.forced,Correct the error before continuing,ผิดแล้วต้องแก้ก่อน
+status.natural,Continue after an error,ผิดแล้วไปต่อได้
+custom.title,Custom text,ข้อความกำหนดเอง
+custom.placeholder,Paste Thai or English text to practice...,วางข้อความไทยหรืออังกฤษที่อยากฝึก...
+custom.useLesson,Use lesson,กลับบทเรียน
+custom.practice,Practice this text,เริ่มฝึกข้อความนี้
+result.complete,Lesson complete,จบบทแล้ว
+result.mistakes,mistakes,ครั้งที่พลาด
+result.perfect,No mistakes,ไม่มีจุดพลาด
+result.retry,Try again,ซ้อมอีกครั้ง
+result.next,Next lesson →,บทถัดไป →
+finger.guide,Finger guide,คำแนะนำนิ้ว
+finger.lp,Left pinky,ก้อยซ้าย
+finger.lr,Left ring,นางซ้าย
+finger.lm,Left middle,กลางซ้าย
+finger.li,Left index,ชี้ซ้าย
+finger.ri,Right index,ชี้ขวา
+finger.rm,Right middle,กลางขวา
+finger.rr,Right ring,นางขวา
+finger.rp,Right pinky,ก้อยขวา
+finger.thumb,Thumb,นิ้วโป้ง
+keyboard.thCaption,Thai Kedmanee · press English physical keys and PimDee maps them to Thai automatically,แป้นไทยเกษมณี · กดคีย์อังกฤษได้ ระบบ map เป็นไทยให้อัตโนมัติ
+keyboard.enCaption,English QWERTY · finger placement guide,English QWERTY · finger placement guide
+roadmap.phase2,Race 60s + Tone Mark Trainer,Race 60s + Tone Mark Trainer
+roadmap.phase3,Login + Stats Dashboard,Login + Stats Dashboard
+roadmap.storage,Storage uses Adapter Pattern: local / Firebase / Supabase,Storage ใช้ Adapter Pattern: local / Firebase / Supabase
+footer,PimDee · Kedmanee only · Static-first · GitHub Pages ready,PimDee · Kedmanee only · Static-first · GitHub Pages ready
+tooltip.language,Switch interface and practice language,สลับภาษา UI และภาษาที่ฝึก
+tooltip.lesson,Open this lesson,เลือกฝึกบทเรียนนี้
+tooltip.natural,Errors are recorded but typing continues,พิมพ์ผิดแล้วบันทึกความผิดพลาดแต่ไปต่อได้
+tooltip.forced,You must correct an error before continuing,พิมพ์ผิดแล้วต้องแก้ก่อนจึงไปต่อได้
+tooltip.reset,Restart the current practice,เริ่มการฝึกปัจจุบันใหม่
+tooltip.useLesson,Return to the selected lesson,กลับไปใช้ข้อความจากบทเรียนที่เลือก
+tooltip.practiceCustom,Start practicing the custom text,เริ่มฝึกจากข้อความที่กำหนดเอง
+tooltip.retry,Restart with the same text,เริ่มฝึกข้อความเดิมอีกครั้ง
+tooltip.nextLesson,Continue to the next lesson,ไปยังบทเรียนถัดไป
+tooltip.key,Physical key {{key}} types {{char}},ปุ่มจริง {{key}} ใช้พิมพ์ {{char}}
+error.title,Something went wrong,เกิดข้อผิดพลาด
+error.body,Reload the page and try again.,โหลดหน้าใหม่แล้วลองอีกครั้ง

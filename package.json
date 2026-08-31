@@ -1,26 +1,30 @@
 {
   "name": "pimdee",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "homepage": "https://dexter-cnx.github.io/PimDee/",
   "scripts": {
-    "dev": "vite",
-    "typecheck": "tsc --noEmit",
-    "build": "vite build",
-    "preview": "vite preview",
-    "deploy": "gh-pages -d dist"
+    "gen:l10n": "node scripts/gen-locales.mjs",
+    "check:l10n": "node scripts/gen-locales.mjs --check",
+    "dev": "npm run gen:l10n && vite",
+    "typecheck": "npm run gen:l10n && tsc --noEmit",
+    "test": "vitest run",
+    "build": "npm run gen:l10n && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "i18next": "26.4.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-i18next": "17.0.12"
   },
   "devDependencies": {
-    "@types/react": "^18.2.0",
-    "@types/react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^4.0.0",
-    "gh-pages": "^6.0.0",
-    "typescript": "^5.0.0",
-    "vite": "^5.0.0"
+    "@types/react": "19.1.12",
+    "@types/react-dom": "19.1.9",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "5.9.2",
+    "vite": "8.2.2",
+    "vitest": "4.1.10"
   }
 }
