@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { getStatsAdapter } from './adapters'
 import { App } from './App'
+import { Onboarding } from './components/Onboarding'
 import { Phase2App } from './components/Phase2App'
 import { ProgressDashboard } from './components/ProgressDashboard'
 
@@ -16,9 +18,12 @@ const fromHash = (): Workspace => {
 export function WorkspaceRoot() {
   const { i18n } = useTranslation()
   const [workspace, setWorkspace] = useState<Workspace>(fromHash)
+  const [hasRecordedPractice, setHasRecordedPractice] = useState<boolean | null>(null)
+  const [started, setStarted] = useState(false)
   const thai = i18n.language.startsWith('th')
 
   useEffect(() => {
+    getStatsAdapter().getResults('local-user').then((results) => setHasRecordedPractice(results.length > 0)).catch(() => setHasRecordedPractice(false))
     const sync = () => setWorkspace(fromHash())
     window.addEventListener('hashchange', sync)
     return () => window.removeEventListener('hashchange', sync)
@@ -28,6 +33,9 @@ export function WorkspaceRoot() {
     setWorkspace(next)
     window.location.hash = next === 'lessons' ? '' : next
   }
+
+  if (hasRecordedPractice === null) return null
+  if (!hasRecordedPractice && !started) return <Onboarding onStart={() => { setStarted(true); select('lessons') }} />
 
   return <>
     {workspace === 'lessons' && <App />}
