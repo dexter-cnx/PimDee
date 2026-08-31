@@ -54,13 +54,14 @@ export function App() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (!focused || finished || !text) return
-      const value = normalizeInput(event, language); if (value === null) return; event.preventDefault(); if (!startedAt) setStartedAt(Date.now())
+      const expected=text[index]
+      const value = normalizeInput(event, language, expected); if (value === null) return; event.preventDefault(); if (!startedAt) setStartedAt(Date.now())
       if (value === 'BACKSPACE') {
         if (mode === 'forced' && states[index] === 'wrong') { setStates((p)=>{const n=[...p];n[index]='pending';return n}); setTyped((p)=>{const n=[...p];n[index]='';return n}); return }
         if (index>0) { const previous=index-1; setIndex(previous); setStates((p)=>{const n=[...p];n[previous]='pending';return n}); setTyped((p)=>{const n=[...p];n[previous]='';return n}) }
         return
       }
-      const expected=text[index]; const isCorrect=value===expected
+      const isCorrect=value===expected
       setTyped((p)=>{const n=[...p];n[index]=value;return n}); setStates((p)=>{const n=[...p];n[index]=isCorrect?'correct':'wrong';return n})
       if (!isCorrect) { setMistakes((p)=>({...p,[expected]:(p[expected]??0)+1})); if (mode==='forced') return }
       const nextIndex=index+1; if (nextIndex>=text.length) { setIndex(text.length); setElapsed(startedAt?(Date.now()-startedAt)/1000:0); setFinished(true) } else setIndex(nextIndex)
