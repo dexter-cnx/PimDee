@@ -13,6 +13,30 @@ import { LESSONS } from './data/lessons'
 import { languageCode } from './i18n'
 
 const fingers: Finger[] = ['lp','lr','lm','li','ri','rm','rr','rp']
+const graphemeSegmenter = typeof Intl.Segmenter === 'function'
+  ? new Intl.Segmenter('th', { granularity: 'grapheme' })
+  : null
+
+type RenderSegment = { text: string; start: number; end: number }
+
+function segmentForRendering(text: string): RenderSegment[] {
+  if (!graphemeSegmenter) {
+    return Array.from(text).map((char, index) => ({ text: char, start: index, end: index + char.length }))
+  }
+
+  return Array.from(graphemeSegmenter.segment(text), ({ segment, index }) => ({
+    text: segment,
+    start: index,
+    end: index + segment.length,
+  }))
+}
+
+function segmentState(states: TypingState[], segment: RenderSegment): TypingState {
+  const segmentStates = states.slice(segment.start, segment.end)
+  if (segmentStates.some((state) => state === 'wrong')) return 'wrong'
+  if (segmentStates.length > 0 && segmentStates.every((state) => state === 'correct')) return 'correct'
+  return 'pending'
+}
 
 export function App() {
   const { t, i18n } = useTranslation()
@@ -35,6 +59,7 @@ export function App() {
   const practiceRef = useRef<HTMLDivElement>(null)
   const lesson = LESSONS.find((item) => item.id === lessonId) ?? LESSONS[0]
   const text = usingCustom && customText.trim() ? customText.trim() : language === 'TH' ? lesson.th : lesson.en
+  const renderSegments = useMemo(() => segmentForRendering(text), [text])
 
   useEffect(() => { void i18n.changeLanguage(languageCode(language)); document.documentElement.lang = languageCode(language) }, [i18n, language])
   useEffect(() => { void getStatsAdapter().getResults('guest').then(setResults) }, [])
@@ -89,7 +114,7 @@ export function App() {
     <div className="page-grid">
       <aside className="sidebar card"><div className="section-heading"><span>{t('sidebar.lessons')}</span><span className="badge">{t('sidebar.lessonCount')}</span></div><div className="lesson-list">{LESSONS.map((item)=>{const selected=!usingCustom&&lessonId===item.id;const unlocked=isLessonUnlocked(item,LESSONS,results,language);const p=lessonProgress(item,results,language);return <Tooltip key={item.id} hidden={selected} label={unlocked?t('tooltip.lesson'):t('learning.locked')}><button disabled={!unlocked} className={`lesson-item ${selected?'selected':''} ${p.mastered?'mastered':''}`} onClick={()=>{setUsingCustom(false);setCustomOpen(false);setLessonId(item.id)}}><span className="lesson-number">{p.mastered?'✓':item.id}</span><span><strong>{language==='TH'?item.titleTh:item.titleEn}</strong><small>{language==='TH'?item.subtitleTh:item.subtitleEn}</small><em className="lesson-progress">{p.mastered?t('learning.mastered'):p.attempts?`${t('learning.best')} ${p.bestAccuracy}% · ${p.bestWpm} WPM`:`${t('learning.goal')} ${item.criteria.minAccuracy}% · ${item.criteria.minWpm} WPM`}</em></span></button></Tooltip>})}</div><div className="tip-box"><strong>{t('sidebar.tipTitle')}</strong><p>{t('sidebar.tipBody')}</p></div></aside>
       <main className="main-column"><div className="metrics"><Metric label="WPM" value={wpm}/><Metric label={t('metric.accuracy')} value={`${accuracy}%`}/><Metric label={t('metric.time')} value={`${Math.floor(elapsed)}s`}/></div>
-        <section className={`practice card ${focused?'focused':''}`} ref={practiceRef} tabIndex={0} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}><div className="practice-head"><div><strong>{usingCustom?t('practice.customTitle'):`${t('practice.lesson')} ${lesson.id}/${LESSONS.length}: ${lessonTitle}`}</strong><small>{usingCustom?t('practice.customSubtitle'):lessonSubtitle}</small></div><div className="practice-actions"><div className="segmented compact">{(['natural','forced'] as Mode[]).map((item)=><Tooltip key={item} hidden={mode===item} label={t(item==='natural'?'tooltip.natural':'tooltip.forced')}><button className={mode===item?'active':''} onClick={(e)=>{e.stopPropagation();setMode(item)}}>{t(item==='natural'?'mode.natural':'mode.forced')}</button></Tooltip>)}</div><Tooltip hidden={customOpen} label={t('tooltip.customText')}><button className={`text-action ${customOpen?'active':''}`} onClick={(e)=>{e.stopPropagation();setCustomOpen((value)=>!value)}}>{t('custom.open')}</button></Tooltip><Tooltip label={t('tooltip.reset')}><button className="icon-button" onClick={(e)=>{e.stopPropagation();reset()}}>↻</button></Tooltip></div></div><div className="progress"><span style={{width:`${progress}%`}}/></div><div className="typing-area" onClick={()=>practiceRef.current?.focus()}>{!focused&&!finished&&<div className="focus-hint">⌨ {t('practice.focusHint')}</div>}<div className="typing-text">{text.split('').map((char,i)=><span key={`${i}-${char}`} className={`${states[i]??'pending'} ${i===index&&!finished?'cursor':''}`}>{char===' '?'\u00A0':char}</span>)}</div><div className="status-row"><span>{t('status.correct')} {correctCount}</span><span>{t('status.wrong')} {wrongCount}</span><span>{t(mode==='forced'?'status.forced':'status.natural')}</span>{!usingCustom&&<span>{t('learning.goal')} {lesson.criteria.minAccuracy}% · {lesson.criteria.minWpm} WPM</span>}</div></div><Keyboard language={language} expectedKey={expectedKey} mistakes={mistakes}/></section>
+        <section className={`practice card ${focused?'focused':''}`} ref={practiceRef} tabIndex={0} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}><div className="practice-head"><div><strong>{usingCustom?t('practice.customTitle'):`${t('practice.lesson')} ${lesson.id}/${LESSONS.length}: ${lessonTitle}`}</strong><small>{usingCustom?t('practice.customSubtitle'):lessonSubtitle}</small></div><div className="practice-actions"><div className="segmented compact">{(['natural','forced'] as Mode[]).map((item)=><Tooltip key={item} hidden={mode===item} label={t(item==='natural'?'tooltip.natural':'tooltip.forced')}><button className={mode===item?'active':''} onClick={(e)=>{e.stopPropagation();setMode(item)}}>{t(item==='natural'?'mode.natural':'mode.forced')}</button></Tooltip>)}</div><Tooltip hidden={customOpen} label={t('tooltip.customText')}><button className={`text-action ${customOpen?'active':''}`} onClick={(e)=>{e.stopPropagation();setCustomOpen((value)=>!value)}}>{t('custom.open')}</button></Tooltip><Tooltip label={t('tooltip.reset')}><button className="icon-button" onClick={(e)=>{e.stopPropagation();reset()}}>↻</button></Tooltip></div></div><div className="progress"><span style={{width:`${progress}%`}}/></div><div className="typing-area" onClick={()=>practiceRef.current?.focus()}>{!focused&&!finished&&<div className="focus-hint">⌨ {t('practice.focusHint')}</div>}<div className="typing-text" lang={languageCode(language)}>{renderSegments.map((segment)=>{const state=segmentState(states,segment);const cursor=!finished&&index>=segment.start&&index<segment.end;return <span key={`${segment.start}-${segment.text}`} className={`grapheme ${state} ${cursor?'cursor':''}`}>{segment.text===' '?'\u00A0':segment.text}</span>})}</div><div className="status-row"><span>{t('status.correct')} {correctCount}</span><span>{t('status.wrong')} {wrongCount}</span><span>{t(mode==='forced'?'status.forced':'status.natural')}</span>{!usingCustom&&<span>{t('learning.goal')} {lesson.criteria.minAccuracy}% · {lesson.criteria.minWpm} WPM</span>}</div></div><Keyboard language={language} expectedKey={expectedKey} mistakes={mistakes}/></section>
         {customOpen&&<section className="custom card"><div className="section-heading"><span>{t('custom.title')}</span><button className="close-action" aria-label={t('custom.close')} onClick={()=>setCustomOpen(false)}>×</button></div><textarea autoFocus value={customText} onChange={(e)=>setCustomText(e.target.value)} placeholder={t('custom.placeholder')}/><div className="custom-actions">{usingCustom&&<button className="secondary" onClick={returnToLesson}>{t('custom.useLesson')}</button>}<button className="primary" disabled={!customText.trim()} onClick={startCustom}>{t('custom.practice')}</button></div></section>}
         {finished&&<section className="result card"><div className="result-title">✓ {t('result.complete')}</div><p>{wpm} WPM · {accuracy}% · {Math.floor(elapsed)}s · {wrongCount} {t('result.mistakes')}</p>{!usingCustom&&<p className="mastery-line">{currentProgress.mastered?t('learning.mastered'):`${t('learning.goal')} ${lesson.criteria.minAccuracy}% · ${lesson.criteria.minWpm} WPM`}</p>}<div className="heatmap-summary">{topMistakes.length===0?<span className="perfect">{t('result.perfect')}</span>:topMistakes.map(([char,count])=><span key={char}>{char} ×{count}</span>)}</div><div className="result-actions">{adaptiveText&&<Tooltip label={t('learning.adaptiveHint')}><button className="secondary" onClick={startAdaptive}>{t('learning.adaptive')}</button></Tooltip>}<button className="secondary" onClick={()=>reset()}>{t('result.retry')}</button>{usingCustom?<button className="secondary" onClick={returnToLesson}>{t('custom.useLesson')}</button>:lesson.id<LESSONS.length&&<button className="primary" disabled={!isLessonUnlocked(LESSONS[lesson.id],LESSONS,results,language)} onClick={()=>setLessonId((value)=>value+1)}>{t('result.next')}</button>}</div></section>}
       </main>
