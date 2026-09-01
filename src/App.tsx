@@ -29,32 +29,49 @@ function markPosition(mark: string): 'upper' | 'lower' {
 }
 
 function buildDisplayTokens(text: string): DisplayToken[] {
-  const segments = graphemeSegmenter
-    ? Array.from(graphemeSegmenter.segment(text), ({ segment, index }) => ({ segment, index }))
-    : Array.from(text).map((segment, index) => ({ segment, index }))
-
   const tokens: DisplayToken[] = []
-  for (const { segment, index } of segments) {
-    if (segment === ' ') {
-      tokens.push({ kind: 'space', text: 'SP', start: index, end: index + 1 })
-      continue
-    }
+  let runStart = 0
 
-    if (standaloneMarkPattern.test(segment)) {
-      Array.from(segment).forEach((mark, offset) => {
-        tokens.push({
-          kind: 'mark',
-          text: mark,
-          start: index + offset,
-          end: index + offset + 1,
-          position: markPosition(mark),
+  const pushNonSpaceRun = (run: string, absoluteStart: number) => {
+    if (!run) return
+
+    const segments = graphemeSegmenter
+      ? Array.from(graphemeSegmenter.segment(run), ({ segment, index }) => ({ segment, index }))
+      : Array.from(run).map((segment, index) => ({ segment, index }))
+
+    for (const { segment, index } of segments) {
+      const start = absoluteStart + index
+
+      if (standaloneMarkPattern.test(segment)) {
+        Array.from(segment).forEach((mark, offset) => {
+          tokens.push({
+            kind: 'mark',
+            text: mark,
+            start: start + offset,
+            end: start + offset + 1,
+            position: markPosition(mark),
+          })
         })
-      })
-      continue
-    }
+        continue
+      }
 
-    tokens.push({ kind: 'text', text: segment, start: index, end: index + segment.length })
+      tokens.push({ kind: 'text', text: segment, start, end: start + segment.length })
+    }
   }
+
+  for (let cursor = 0; cursor <= text.length; cursor += 1) {
+    const atEnd = cursor === text.length
+    const atSpace = !atEnd && text[cursor] === ' '
+    if (!atEnd && !atSpace) continue
+
+    pushNonSpaceRun(text.slice(runStart, cursor), runStart)
+
+    if (atSpace) {
+      tokens.push({ kind: 'space', text: 'SP', start: cursor, end: cursor + 1 })
+      runStart = cursor + 1
+    }
+  }
+
   return tokens
 }
 
