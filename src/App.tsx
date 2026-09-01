@@ -19,37 +19,56 @@ const graphemeSegmenter = typeof Intl.Segmenter === 'function'
 const canInspectAllLessons = import.meta.env.DEV
 const standaloneMarkPattern = /^\p{Mark}+$/u
 
-type RenderSegment = { text: string; start: number; end: number }
-
-function segmentForRendering(text: string): RenderSegment[] {
-  if (!graphemeSegmenter) {
-    return Array.from(text).map((char, index) => ({ text: char, start: index, end: index + char.length }))
-  }
-
-  return Array.from(graphemeSegmenter.segment(text), ({ segment, index }) => ({
-    text: segment,
-    start: index,
-    end: index + segment.length,
-  }))
-}
-
-function segmentState(states: TypingState[], segment: RenderSegment): TypingState {
-  const segmentStates = states.slice(segment.start, segment.end)
-  if (segmentStates.some((state) => state === 'wrong')) return 'wrong'
-  if (segmentStates.length > 0 && segmentStates.every((state) => state === 'correct')) return 'correct'
-  return 'pending'
-}
-
-function isStandaloneMark(segmentText: string): boolean {
-  return standaloneMarkPattern.test(segmentText)
-}
+type DisplayToken =
+  | { kind: 'text'; text: string; start: number; end: number }
+  | { kind: 'space'; text: 'SP'; start: number; end: number }
+  | { kind: 'mark'; text: string; start: number; end: number; position: 'upper' | 'lower' }
 
 function markPosition(mark: string): 'upper' | 'lower' {
   return mark === 'ุ' || mark === 'ู' ? 'lower' : 'upper'
 }
 
-function displaySegmentText(segmentText: string): string {
-  return segmentText === ' ' ? '␠' : segmentText
+function buildDisplayTokens(text: string): DisplayToken[] {
+  const segments = graphemeSegmenter
+    ? Array.from(graphemeSegmenter.segment(text), ({ segment, index }) => ({ segment, index }))
+    : Array.from(text).map((segment, index) => ({ segment, index }))
+
+  const tokens: DisplayToken[] = []
+  for (const { segment, index } of segments) {
+    if (segment === ' ') {
+      tokens.push({ kind: 'space', text: 'SP', start: index, end: index + 1 })
+      continue
+    }
+
+    if (standaloneMarkPattern.test(segment)) {
+      Array.from(segment).forEach((mark, offset) => {
+        tokens.push({
+          kind: 'mark',
+          text: mark,
+          start: index + offset,
+          end: index + offset + 1,
+          position: markPosition(mark),
+        })
+      })
+      continue
+    }
+
+    tokens.push({ kind: 'text', text: segment, start: index, end: index + segment.length })
+  }
+  return tokens
+}
+
+function tokenState(states: TypingState[], token: DisplayToken): TypingState {
+  const tokenStates = states.slice(token.start, token.end)
+  if (tokenStates.some((state) => state === 'wrong')) return 'wrong'
+  if (tokenStates.length > 0 && tokenStates.every((state) => state === 'correct')) return 'correct'
+  return 'pending'
+}
+
+function isCurrentToken(token: DisplayToken, index: number, finished: boolean): boolean {
+  if (finished) return false
+  if (token.kind === 'text') return index >= token.start && index < token.end
+  return index === token.start
 }
 
 export function App() {
@@ -73,7 +92,7 @@ export function App() {
   const practiceRef = useRef<HTMLDivElement>(null)
   const lesson = LESSONS.find((item) => item.id === lessonId) ?? LESSONS[0]
   const text = usingCustom && customText.trim() ? customText.trim() : language === 'TH' ? lesson.th : lesson.en
-  const renderSegments = useMemo(() => segmentForRendering(text), [text])
+  const displayTokens = useMemo(() => buildDisplayTokens(text), [text])
 
   useEffect(() => { void i18n.changeLanguage(languageCode(language)); document.documentElement.lang = languageCode(language) }, [i18n, language])
   useEffect(() => { void getStatsAdapter().getResults('guest').then(setResults) }, [])
@@ -128,7 +147,7 @@ export function App() {
     <div className="page-grid">
       <aside className="sidebar card"><div className="section-heading"><span>{t('sidebar.lessons')}</span><span className="badge">{t('sidebar.lessonCount')}</span></div><div className="lesson-list">{LESSONS.map((item)=>{const selected=!usingCustom&&lessonId===item.id;const unlocked=canInspectAllLessons||isLessonUnlocked(item,LESSONS,results,language);const p=lessonProgress(item,results,language);return <Tooltip key={item.id} hidden={selected} label={unlocked?t('tooltip.lesson'):t('learning.locked')}><button disabled={!unlocked} className={`lesson-item ${selected?'selected':''} ${p.mastered?'mastered':''}`} onClick={()=>{setUsingCustom(false);setCustomOpen(false);setLessonId(item.id)}}><span className="lesson-number">{p.mastered?'✓':item.id}</span><span><strong>{language==='TH'?item.titleTh:item.titleEn}</strong><small>{language==='TH'?item.subtitleTh:item.subtitleEn}</small><em className="lesson-progress">{p.mastered?t('learning.mastered'):p.attempts?`${t('learning.best')} ${p.bestAccuracy}% · ${p.bestWpm} WPM`:`${t('learning.goal')} ${item.criteria.minAccuracy}% · ${item.criteria.minWpm} WPM`}</em></span></button></Tooltip>})}</div><div className="tip-box"><strong>{t('sidebar.tipTitle')}</strong><p>{t('sidebar.tipBody')}</p></div></aside>
       <main className="main-column"><div className="metrics"><Metric label="WPM" value={wpm}/><Metric label={t('metric.accuracy')} value={`${accuracy}%`}/><Metric label={t('metric.time')} value={`${Math.floor(elapsed)}s`}/></div>
-        <section className={`practice card ${focused?'focused':''}`} ref={practiceRef} tabIndex={0} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}><div className="practice-head"><div><strong>{usingCustom?t('practice.customTitle'):`${t('practice.lesson')} ${lesson.id}/${LESSONS.length}: ${lessonTitle}`}</strong><small>{usingCustom?t('practice.customSubtitle'):lessonSubtitle}</small></div><div className="practice-actions"><div className="segmented compact">{(['natural','forced'] as Mode[]).map((item)=><Tooltip key={item} hidden={mode===item} label={t(item==='natural'?'tooltip.natural':'tooltip.forced')}><button className={mode===item?'active':''} onClick={(e)=>{e.stopPropagation();setMode(item)}}>{t(item==='natural'?'mode.natural':'mode.forced')}</button></Tooltip>)}</div><Tooltip hidden={customOpen} label={t('tooltip.customText')}><button className={`text-action ${customOpen?'active':''}`} onClick={(e)=>{e.stopPropagation();setCustomOpen((value)=>!value)}}>{t('custom.open')}</button></Tooltip><Tooltip label={t('tooltip.reset')}><button className="icon-button" onClick={(e)=>{e.stopPropagation();reset()}}>↻</button></Tooltip></div></div><div className="progress"><span style={{width:`${progress}%`}}/></div><div className="typing-area" onClick={()=>practiceRef.current?.focus()}>{!focused&&!finished&&<div className="focus-hint">⌨ {t('practice.focusHint')}</div>}<div className="typing-text" lang={languageCode(language)}>{renderSegments.map((segment)=>{const state=segmentState(states,segment);const cursor=!finished&&index>=segment.start&&index<segment.end;const standaloneMark=isStandaloneMark(segment.text);const space=segment.text===' ';return <span key={`${segment.start}-${segment.text}`} className={`grapheme ${standaloneMark?'standalone-mark':''} ${space?'space-grapheme':''} ${state} ${cursor?'cursor':''}`}>{standaloneMark?Array.from(segment.text).map((mark,markIndex)=><span key={`${segment.start}-${markIndex}`} className={`mark-cell ${markPosition(mark)} ${!finished&&index===segment.start+markIndex?'active-mark':''}`}><span className="mark-glyph">{mark}</span></span>):displaySegmentText(segment.text)}</span>})}</div><div className="status-row"><span>{t('status.correct')} {correctCount}</span><span>{t('status.wrong')} {wrongCount}</span><span>{t(mode==='forced'?'status.forced':'status.natural')}</span>{!usingCustom&&<span>{t('learning.goal')} {lesson.criteria.minAccuracy}% · {lesson.criteria.minWpm} WPM</span>}</div></div><Keyboard language={language} expectedKey={expectedKey} mistakes={mistakes}/></section>
+        <section className={`practice card ${focused?'focused':''}`} ref={practiceRef} tabIndex={0} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}><div className="practice-head"><div><strong>{usingCustom?t('practice.customTitle'):`${t('practice.lesson')} ${lesson.id}/${LESSONS.length}: ${lessonTitle}`}</strong><small>{usingCustom?t('practice.customSubtitle'):lessonSubtitle}</small></div><div className="practice-actions"><div className="segmented compact">{(['natural','forced'] as Mode[]).map((item)=><Tooltip key={item} hidden={mode===item} label={t(item==='natural'?'tooltip.natural':'tooltip.forced')}><button className={mode===item?'active':''} onClick={(e)=>{e.stopPropagation();setMode(item)}}>{t(item==='natural'?'mode.natural':'mode.forced')}</button></Tooltip>)}</div><Tooltip hidden={customOpen} label={t('tooltip.customText')}><button className={`text-action ${customOpen?'active':''}`} onClick={(e)=>{e.stopPropagation();setCustomOpen((value)=>!value)}}>{t('custom.open')}</button></Tooltip><Tooltip label={t('tooltip.reset')}><button className="icon-button" onClick={(e)=>{e.stopPropagation();reset()}}>↻</button></Tooltip></div></div><div className="progress"><span style={{width:`${progress}%`}}/></div><div className="typing-area" onClick={()=>practiceRef.current?.focus()}>{!focused&&!finished&&<div className="focus-hint">⌨ {t('practice.focusHint')}</div>}<div className="typing-text" lang={languageCode(language)}>{displayTokens.map((token)=>{const state=tokenState(states,token);const current=isCurrentToken(token,index,finished);if(token.kind==='space')return <span key={`space-${token.start}`} className={`grapheme space-token ${state} ${current?'current':''}`}>SP</span>;if(token.kind==='mark')return <span key={`mark-${token.start}`} className={`grapheme mark-token ${token.position} ${state} ${current?'current':''}`}><span className="mark-guide"/><span className="mark-glyph">{token.text}</span></span>;return <span key={`text-${token.start}`} className={`grapheme text-token ${state} ${current?'current':''}`}>{token.text}</span>})}</div><div className="status-row"><span>{t('status.correct')} {correctCount}</span><span>{t('status.wrong')} {wrongCount}</span><span>{t(mode==='forced'?'status.forced':'status.natural')}</span>{!usingCustom&&<span>{t('learning.goal')} {lesson.criteria.minAccuracy}% · {lesson.criteria.minWpm} WPM</span>}</div></div><Keyboard language={language} expectedKey={expectedKey} mistakes={mistakes}/></section>
         {customOpen&&<section className="custom card"><div className="section-heading"><span>{t('custom.title')}</span><button className="close-action" aria-label={t('custom.close')} onClick={()=>setCustomOpen(false)}>×</button></div><textarea autoFocus value={customText} onChange={(e)=>setCustomText(e.target.value)} placeholder={t('custom.placeholder')}/><div className="custom-actions">{usingCustom&&<button className="secondary" onClick={returnToLesson}>{t('custom.useLesson')}</button>}<button className="primary" disabled={!customText.trim()} onClick={startCustom}>{t('custom.practice')}</button></div></section>}
         {finished&&<section className="result card"><div className="result-title">✓ {t('result.complete')}</div><p>{wpm} WPM · {accuracy}% · {Math.floor(elapsed)}s · {wrongCount} {t('result.mistakes')}</p>{!usingCustom&&<p className="mastery-line">{currentProgress.mastered?t('learning.mastered'):`${t('learning.goal')} ${lesson.criteria.minAccuracy}% · ${lesson.criteria.minWpm} WPM`}</p>}<div className="heatmap-summary">{topMistakes.length===0?<span className="perfect">{t('result.perfect')}</span>:topMistakes.map(([char,count])=><span key={char}>{char} ×{count}</span>)}</div><div className="result-actions">{adaptiveText&&<Tooltip label={t('learning.adaptiveHint')}><button className="secondary" onClick={startAdaptive}>{t('learning.adaptive')}</button></Tooltip>}<button className="secondary" onClick={()=>reset()}>{t('result.retry')}</button>{usingCustom?<button className="secondary" onClick={returnToLesson}>{t('custom.useLesson')}</button>:lesson.id<LESSONS.length&&<button className="primary" disabled={!isLessonUnlocked(LESSONS[lesson.id],LESSONS,results,language)} onClick={()=>setLessonId((value)=>value+1)}>{t('result.next')}</button>}</div></section>}
       </main>
