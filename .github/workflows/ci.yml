@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   verify:
+    name: Format, analyze, test, publish dry-run
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
