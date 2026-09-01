@@ -1,312 +1,260 @@
 # PimDee Code Walkthrough
 
-PimDee (พิมพ์ดี) is a static-first Thai/English beginner typing tutor built with Vite, React, and TypeScript. The MVP is designed to run without a backend and deploy directly to GitHub Pages.
+PimDee (พิมพ์ดี) is a static-first Thai/English touch-typing tutor built with Vite, React, and TypeScript. The current codebase has moved beyond the original MVP: it now includes 36 structured lessons, adaptive practice, dev inspection mode, Phase 2 challenges, localization generation, persistent stats, and Thai-specific grapheme rendering safeguards.
 
-This walkthrough explains the codebase from the entry point through the typing engine, Kedmanee mapping, keyboard visualization, result tracking, storage adapters, and deployment flow.
+This walkthrough describes the current architecture and the important execution paths contributors should understand before modifying the typing engine or Thai text rendering.
 
-## 1. Project structure
+## 1. Current project structure
 
 ```text
 PimDee/
 ├── .github/workflows/
-│   ├── ci.yml                 # TypeScript + production build validation
-│   └── pages.yml              # GitHub Pages deployment
+│   ├── ci.yml
+│   └── pages.yml
+├── locales/
+│   └── locales.csv
+├── scripts/
+│   └── gen-locales.mjs
 ├── src/
 │   ├── adapters/
-│   │   ├── stats-adapter.ts   # Storage contract
-│   │   ├── local-adapter.ts   # LocalStorage implementation
+│   │   ├── stats-adapter.ts
+│   │   ├── local-adapter.ts
 │   │   ├── firebase-adapter.ts
 │   │   ├── supabase-adapter.ts
-│   │   └── index.ts           # Adapter factory
-│   ├── main.tsx               # MVP UI + typing engine
-│   └── styles.css             # Responsive application styling
-├── index.html
+│   │   └── index.ts
+│   ├── components/
+│   │   ├── ErrorBoundary.tsx
+│   │   ├── Keyboard.tsx
+│   │   ├── Metric.tsx
+│   │   ├── Onboarding.tsx
+│   │   ├── Phase2App.tsx
+│   │   ├── ProgressDashboard.tsx
+│   │   └── Tooltip.tsx
+│   ├── core/
+│   │   ├── dashboard.ts
+│   │   ├── keyboard.ts
+│   │   ├── learning.ts
+│   │   ├── metrics.ts
+│   │   ├── phase2.ts
+│   │   └── *.test.ts
+│   ├── data/
+│   │   └── lessons.ts
+│   ├── App.tsx
+│   ├── WorkspaceRoot.tsx
+│   ├── i18n.ts
+│   ├── main.tsx
+│   ├── styles.css
+│   └── review-fixes.css
+├── README.md
+├── README-deploy.md
 ├── package.json
-├── tsconfig.json
 └── vite.config.ts
 ```
 
-For the MVP, most interactive behavior intentionally lives in `src/main.tsx`. This keeps the first release easy to inspect and iterate. As Race Mode, dashboards, authentication, and adaptive lessons arrive, this file should be split into feature modules.
+The main lesson experience lives in `src/App.tsx`. Cross-screen routing/workspace composition lives in `WorkspaceRoot.tsx`, while Phase 2 challenge screens live in `components/Phase2App.tsx`.
 
----
+## 2. Application startup and workspace composition
 
-## 2. Application entry point
+`src/main.tsx` initializes React, localization, global styles, and the top-level workspace component.
 
-`src/main.tsx` ends with the standard React root bootstrap:
+`WorkspaceRoot.tsx` is the screen-level coordinator. It decides whether the user is in the normal lesson flow, onboarding/dashboard views, or a Phase 2 challenge.
 
-```tsx
-createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
+This separation is important because the lesson engine and the Phase 2 challenge engine share keyboard/domain concepts, but they are not the same UI component.
+
+## 3. Keyboard input model
+
+Thai lessons are based on the standard Thai Kedmanee layout. PimDee maps physical QWERTY keys to Thai output so the learner can keep an English keyboard layout active at the operating-system level.
+
+The core mapping lives in:
+
+```text
+src/core/keyboard.ts
 ```
 
-`App` owns the MVP session state: selected language, lesson, typing mode, current cursor, typed characters, correctness state, mistake counts, timer, and completion state.
-
-The main domain types are deliberately small:
+The two most important functions are:
 
 ```ts
-type Lang = 'TH' | 'EN'
-type Mode = 'natural' | 'forced'
-type Finger = 'lp' | 'lr' | 'lm' | 'li' | 'ri' | 'rm' | 'rr' | 'rp' | 'thumb'
-```
-
-This makes invalid UI states harder to create than using unconstrained strings.
-
----
-
-## 3. Kedmanee keyboard mapping
-
-The important design decision in PimDee is that a learner does **not** need to switch the operating-system keyboard to Thai during Thai lessons.
-
-`TH_MAP` maps physical QWERTY keys to Thai Kedmanee output:
-
-```ts
-const TH_MAP: Record<string, string> = {
-  a: 'ฟ',
-  s: 'ห',
-  d: 'ก',
-  f: 'ด',
-  j: '่',
-  k: 'า',
-  l: 'ส',
-  ';': 'ว',
-  // ...
-}
-```
-
-So when the lesson expects `ฟ`, pressing physical key `A` is accepted as `ฟ`.
-
-Shifted Kedmanee characters are handled separately by `TH_SHIFT_MAP`:
-
-```ts
-const TH_SHIFT_MAP: Record<string, string> = {
-  u: '๊',
-  j: '๋',
-  n: '์',
-  h: '็',
-  // ...
-}
-```
-
-Keeping normal and shifted maps separate makes tone-mark behavior explicit and prepares the code for the dedicated Tone Mark Trainer planned in Phase 2.
-
-### Input normalization
-
-All keyboard events pass through:
-
-```ts
-normalizeInput(event, language)
-```
-
-Its responsibilities are:
-
-1. Convert `Backspace` into the internal `BACKSPACE` command.
-2. Ignore navigation/modifier combinations such as Tab, Enter, Cmd/Ctrl, and Alt.
-3. Leave English character input unchanged in EN mode.
-4. Convert physical QWERTY input into Kedmanee characters in TH mode.
-5. Use `TH_SHIFT_MAP` when Shift is held.
-
-This isolates keyboard-layout concerns from the typing-state machine.
-
----
-
-## 4. Finding the physical key for the next character
-
-The UI highlights the key the learner should press next.
-
-That is handled by:
-
-```ts
+normalizeInput(event, language, expected)
 equivalentKeyForChar(char, language)
 ```
 
-For English it returns the lowercase character directly. For Thai it performs a reverse lookup through `TH_MAP` and `TH_SHIFT_MAP`.
+`normalizeInput()` converts a physical keyboard event into the character PimDee expects. It handles normal Kedmanee keys, shifted Kedmanee keys, Space, and Backspace behavior.
 
-Example:
+`equivalentKeyForChar()` performs the reverse lookup used by the visual keyboard so the next physical key can be highlighted.
 
-```text
-Expected lesson character: ฟ
-TH_MAP reverse lookup:      a
-Highlighted physical key:   A
-```
+The keyboard model is tested in `src/core/keyboard.test.ts`.
 
-This same separation is useful later for finger coaching, audio hints, and adaptive drills.
+## 4. Lesson data and progression
 
----
-
-## 5. Keyboard model and finger assignments
-
-`KEYS` describes the visual keyboard independently of the typing text.
-
-Each key contains:
-
-```ts
-type KeyDef = {
-  en: string
-  th: string
-  finger: Finger
-  shiftedTh?: string
-}
-```
-
-Example:
-
-```ts
-{ en: 'a', th: 'ฟ', finger: 'lp' }
-```
-
-`lp` means left pinky. The current MVP assigns every displayed key to a finger and renders the assignment through CSS classes such as:
+The current lesson pack lives in:
 
 ```text
-finger-lp
-finger-li
-finger-ri
-finger-rp
+src/data/lessons.ts
 ```
 
-The visualization therefore has three simultaneous teaching signals:
+There are 36 lessons covering:
 
-- QWERTY physical key
-- Kedmanee Thai character
-- expected finger
+- home row
+- top row
+- bottom row
+- three-row integration
+- Shift
+- Thai vowels and marks
+- tone marks
+- vocabulary and phrases
+- numbers and punctuation
+- mixed Thai/English usage
+- progressively longer real-world text
 
-The `Keyboard` component also receives the current `expectedKey` and applies the `expected` class to guide the learner visually.
+Each lesson has mastery criteria generated from its lesson ID. Criteria become gradually stricter as the learner advances.
 
----
-
-## 6. Lesson model
-
-Lessons are data, not hard-coded UI branches.
-
-```ts
-type Lesson = {
-  id: number
-  titleTh: string
-  titleEn: string
-  subtitleTh: string
-  subtitleEn: string
-  th: string
-  en: string
-}
-```
-
-The MVP contains six lessons:
-
-1. Home row / แถวเหย้า
-2. Top row / แถวบน
-3. Bottom row / แถวล่าง
-4. Tone marks / วรรณยุกต์
-5. Mixed TH/EN usage / สลับภาษา
-6. Everyday sentences / ประโยคใช้งานจริง
-
-Because lessons are plain data, future lesson packs can move to JSON or a dedicated repository without rewriting the engine.
-
-A logical future extraction would be:
+The learning rules live in:
 
 ```text
-src/features/lessons/data/basic-lessons.ts
+src/core/learning.ts
 ```
 
----
+Important responsibilities include:
 
-## 7. Typing session state
+- lesson unlock rules
+- lesson progress aggregation
+- mastery checks
+- adaptive drill generation from mistake history
 
-The central state is:
+During local development, `App.tsx` enables all lessons through:
 
 ```ts
-const [index, setIndex] = useState(0)
-const [typed, setTyped] = useState<string[]>([])
-const [states, setStates] = useState<Array<'pending' | 'correct' | 'wrong'>>([])
-const [mistakes, setMistakes] = useState<Record<string, number>>({})
-const [startedAt, setStartedAt] = useState<number | null>(null)
-const [elapsed, setElapsed] = useState(0)
-const [finished, setFinished] = useState(false)
+const canInspectAllLessons = import.meta.env.DEV
 ```
 
-Think of these as the MVP typing-session state machine:
+This is intentionally a development-only inspection aid so every lesson can be reviewed without completing prerequisites.
+
+## 5. Typing-session state
+
+The lesson flow keeps keystroke progress as a raw text index.
+
+Conceptually:
+
+```ts
+index: number
+states: TypingState[]
+mistakes: Record<string, number>
+startedAt: number | null
+elapsed: number
+finished: boolean
+```
+
+The typing engine remains character/code-unit oriented because each physical keypress must be evaluated independently, including Thai vowels and tone marks.
+
+The presentation layer, however, must not render Thai text one raw code unit at a time. That distinction is central to the Thai rendering fix described below.
+
+## 6. Thai grapheme rendering: typing model vs display model
+
+Thai shaping is sensitive to how characters are grouped in the DOM. Rendering every Unicode code point in a separate `<span>` can cause upper/lower vowels and tone marks to attach to the wrong base character or visually overlap.
+
+PimDee therefore separates two models:
 
 ```text
-idle
-  ↓ first valid key
-running
-  ↓ each character
-correct / wrong
-  ↓ last target character
-finished
+Typing model  -> raw text index / one expected key at a time
+Display model -> grapheme-aware visual tokens
 ```
 
-`reset()` returns the session to the initial state and focuses the practice area.
+The display model uses three token types:
 
-Lesson changes, language changes, and switching between lesson/custom-text mode trigger a reset so stale progress cannot leak into another exercise.
+```ts
+type DisplayToken =
+  | { kind: 'text'; text: string; start: number; end: number }
+  | { kind: 'space'; text: 'SP'; start: number; end: number }
+  | { kind: 'mark'; text: string; start: number; end: number; position: 'upper' | 'lower' }
+```
 
----
+This allows the DOM to preserve Thai shaping while still mapping correctness and cursor state back to the raw typing index.
 
-## 8. Natural vs Forced Correction mode
+## 7. Why Space is tokenized before grapheme segmentation
 
-Both modes use the same engine but differ after an error.
+A subtle Unicode issue was found during testing: a browser grapheme segmenter can group a Space with a following combining mark in ways that make the Space disappear as an independent display target.
 
-### Natural mode
+For that reason, PimDee first splits the raw source text around literal spaces and creates explicit Space tokens:
 
 ```text
-wrong key → mark red → count mistake → advance
+kind: 'space'
+text: 'SP'
 ```
 
-This resembles normal typing and is useful for measuring fluent speed.
+Only the non-space runs are passed through `Intl.Segmenter`.
 
-### Forced correction mode
+This guarantees that every physical Space keypress has a corresponding visible `SP` marker and current-target state.
+
+## 8. Standalone Thai mark rendering
+
+Some lessons intentionally practice Thai upper/lower marks as individual keystrokes. These cannot be rendered like normal word text because a combining mark has no base consonant to attach to.
+
+Standalone marks are detected using a Unicode Mark pattern and rendered as dedicated `mark-token` cells.
+
+Upper and lower marks use different visual positioning:
 
 ```text
-wrong key → mark red → stay on current position → learner must correct
+upper -> vowel/tone glyph near top, guide below
+lower -> vowel glyph near bottom, guide above
 ```
 
-The implementation stops advancement here:
+Their cursor/target styling is intentionally separate from normal Thai word shaping.
 
-```ts
-if (!isCorrect) {
-  setMistakes(...)
-  if (mode === 'forced') return
-}
+The main CSS for this behavior is in:
+
+```text
+src/review-fixes.css
 ```
 
-Backspace can clear the failed position before the learner retries it.
+## 9. Normal Thai text must remain naturally shaped
 
-The engine therefore stays shared while the correction policy remains configurable.
+Normal Thai words are rendered as grapheme-aware `text-token` spans.
 
----
+A critical rule is that these spans must not introduce artificial horizontal spacing around every grapheme. Extra padding or margin between normal Thai grapheme clusters can make words look broken even when segmentation is technically correct.
 
-## 9. WPM, accuracy, progress, and timing
+Current styling therefore keeps normal text-token layout neutral and applies visible target styling only to the active token.
 
-Live metrics are derived from session state rather than stored independently.
+The lesson view and Phase 2 view both use this same shaping principle.
 
-### Accuracy
+## 10. Lesson practice modes
 
-```ts
-accuracy = correct / attempted * 100
+PimDee supports two correction policies.
+
+Natural mode:
+
+```text
+wrong key -> record error -> advance
 ```
 
-### WPM
+Forced correction mode:
 
-PimDee uses the conventional five-character word model:
-
-```ts
-wpm = (correctCharacters / 5) / minutes
+```text
+wrong key -> record error -> stay on current position
 ```
 
-### Progress
+The same session state and metrics are reused in both modes. Only the advancement policy changes.
 
-```ts
-progress = index / text.length * 100
+## 11. Metrics
+
+Metrics are implemented in:
+
+```text
+src/core/metrics.ts
 ```
 
-The timer begins only when the first valid typing key is pressed. A 250 ms interval updates the visible elapsed time while a session is active.
+The key outputs are:
 
-This avoids counting time spent reading instructions before the learner starts.
+- correct character count
+- wrong character count
+- accuracy
+- WPM
+- progress percentage
 
----
+WPM uses the conventional five-character word model.
 
-## 10. Mistake heatmap
+Metric logic is covered by `src/core/metrics.test.ts`.
+
+## 12. Mistake tracking and keyboard heatmap
 
 Mistakes are stored by expected character:
 
@@ -314,279 +262,188 @@ Mistakes are stored by expected character:
 Record<string, number>
 ```
 
-For example:
+`Keyboard.tsx` maps these character errors back to physical keys and applies heat intensity classes.
 
-```json
-{
-  "่": 4,
-  "พ": 2,
-  "า": 1
-}
+This same data is also used by adaptive practice generation so the mistake model is domain data, not presentation-only CSS state.
+
+## 13. Adaptive drills
+
+Adaptive lesson generation lives in:
+
+```text
+src/core/learning.ts
 ```
 
-The `Keyboard` component converts these character mistakes back to each physical key and computes a heat intensity:
+When a learner completes a session with repeated errors, `buildAdaptiveDrill()` can construct a short practice sequence biased toward weak keys while retaining lesson focus characters.
 
-```ts
-const heat = Math.min(4, mistakeForKey(key))
+This is deliberately built on the same typing engine rather than introducing a separate practice implementation.
+
+## 14. Phase 2 challenges
+
+Phase 2 currently includes challenge-specific flows such as:
+
+- Race 60 seconds
+- Tone Mark Trainer
+
+Challenge text and scoring helpers live in:
+
+```text
+src/core/phase2.ts
 ```
 
-The key receives a CSS class from `heat-0` through `heat-4`.
+The UI lives in:
 
-This is deliberately kept as semantic data rather than storing CSS state, so later analytics can reuse the same counts to identify weak keys and weak fingers.
-
-That becomes especially important for Phase 3 statistics and Phase 4 adaptive lessons.
-
----
-
-## 11. Custom Text mode
-
-The textarea allows the learner to paste arbitrary text.
-
-When Custom Text is activated:
-
-```ts
-usingCustom === true
+```text
+src/components/Phase2App.tsx
 ```
 
-and the source text changes from the selected lesson to:
+An important regression was fixed here: Phase 2 originally rendered text using `text.split('')`, which reintroduced the same Thai combining-mark problem already solved in the lesson page.
 
-```ts
-customText.trim()
+Phase 2 now uses the same grapheme/display-token strategy as `App.tsx`, including explicit Space tokens and standalone mark handling.
+
+Any future typing surface must follow this rule: **do not render Thai practice text with `split('')` or one span per code point.**
+
+## 15. Progress dashboard
+
+Historical results are transformed by:
+
+```text
+src/core/dashboard.ts
 ```
 
-The same typing engine, WPM calculation, accuracy calculation, keyboard hints, and heatmap are reused without a second implementation.
+and displayed in:
 
-That reuse is important: a lesson is fundamentally only a source of target text and metadata.
+```text
+src/components/ProgressDashboard.tsx
+```
 
----
+The dashboard derives summaries from persisted typing results rather than keeping a second independent data model.
 
-## 12. Stats Adapter architecture
+Dashboard transformations are tested in `src/core/dashboard.test.ts`.
 
-Backend independence is intentional.
+## 16. Stats adapter architecture
 
-The contract lives in:
+Persistence is abstracted behind:
 
 ```text
 src/adapters/stats-adapter.ts
 ```
 
-Conceptually:
+Implementations currently include:
 
-```ts
-interface StatsAdapter {
-  saveResult(result): Promise<void>
-  getResults(userId): Promise<TypingResult[]>
-  getLeaderboard(): Promise<...>
-}
-```
+- local browser storage
+- Firebase adapter boundary
+- Supabase adapter boundary
 
-The MVP defaults to:
+The adapter factory is in:
 
 ```text
-LocalStorageAdapter
+src/adapters/index.ts
 ```
 
-which means GitHub Pages works with zero backend cost and supports offline/local persistence.
+The default static deployment can run entirely local-first without requiring a backend.
 
-Two future adapters are already separated:
+## 17. Localization workflow
+
+PimDee uses a CSV-first localization workflow.
+
+Source of truth:
 
 ```text
-FirebaseAdapter
-SupabaseAdapter
+locales/locales.csv
 ```
 
-The factory in `src/adapters/index.ts` chooses an implementation according to:
+Generator:
 
 ```text
-VITE_ADAPTER=local|firebase|supabase
+scripts/gen-locales.mjs
 ```
 
-UI and typing-domain code therefore do not need to know whether results are stored in browser storage, Firestore, or Supabase.
+Generated resources are consumed by `src/i18n.ts` and `react-i18next`.
 
-This boundary should remain stable as cloud sync is implemented.
+This keeps translated strings reviewable in a single tabular source rather than editing multiple locale files independently.
 
----
+## 18. Styling layers
 
-## 13. Why the adapter boundary matters
-
-Without an adapter, UI code tends to become coupled to calls like:
-
-```ts
-supabase.from('results').insert(...)
-```
-
-or:
-
-```ts
-addDoc(collection(db, 'results'), ...)
-```
-
-inside React components.
-
-PimDee instead keeps this dependency direction:
+The base application styles live in:
 
 ```text
-Typing UI
-   ↓
-StatsAdapter interface
-   ↓
-LocalStorage / Firebase / Supabase
+src/styles.css
 ```
 
-This enables:
-
-- free static GitHub Pages MVP
-- backend migration without rewriting the typing engine
-- easier automated testing
-- offline mode
-- future guest-to-account migration
-
----
-
-## 14. UI composition
-
-The current page is organized into three main areas:
+Targeted review/fix styling currently lives in:
 
 ```text
-Sidebar          Main practice area          Right guide
-Lessons          Metrics                     Finger guide
-                 Typing text                 Roadmap
-                 Keyboard
-                 Custom text
-                 Results
+src/review-fixes.css
 ```
 
-`styles.css` handles the responsive transformation so this layout can collapse for smaller screens.
+`review-fixes.css` contains the sensitive typing-display overrides for:
 
-The design intentionally avoids a heavy component library. This keeps bundle size and visual dependencies low for a simple static application.
+- explicit Space markers
+- active text target styling
+- standalone upper/lower Thai marks
+- mark guides
+- mistake heat levels
 
----
+When modifying Thai practice text, inspect both files because generic `.typing-text span` rules in `styles.css` can unintentionally affect grapheme shaping.
 
-## 15. GitHub Pages configuration
+## 19. Testing and CI
 
-`vite.config.ts` sets:
+Core behavior has automated tests for:
 
-```ts
-base: '/PimDee/'
-```
+- keyboard mapping
+- metrics
+- lesson progression/adaptive logic
+- dashboard transformations
+- Phase 2 helpers
 
-This is required because the site is hosted as a GitHub project page rather than at the account root.
+The CI workflow should be treated as the merge gate. The expected validation commands are defined by `package.json` and the GitHub Actions workflow.
 
-The expected production URL is:
+Before merge, verify the current PR head has completed CI successfully and that no new blocking review feedback exists.
+
+## 20. GitHub Pages deployment
+
+PimDee is deployable as a static GitHub Pages application.
+
+The Pages workflow lives in:
 
 ```text
-https://dexter-cnx.github.io/PimDee/
+.github/workflows/pages.yml
 ```
 
-The deployment workflow builds `dist/`, uploads it as a Pages artifact, and deploys it through GitHub Actions.
+Deployment details and adapter configuration are documented in `README-deploy.md`.
 
----
+## 21. Rules for future typing-screen work
 
-## 16. CI pipeline
+To avoid reintroducing the Thai rendering bugs fixed in this branch:
 
-The CI workflow is intended to validate every pull request with two application-level gates:
+1. Keep typing evaluation indexed against the raw source string.
+2. Render Thai text through grapheme-aware display tokens.
+3. Extract literal Space tokens before grapheme segmentation.
+4. Never use `text.split('')` for Thai practice rendering.
+5. Treat standalone combining marks as dedicated visual cells.
+6. Do not add persistent margin/padding between normal Thai grapheme clusters.
+7. Apply `lang="th"` / locale-aware font stacks to Thai practice text.
+8. Reuse the same display-token strategy on every new typing surface.
 
-```bash
-npm run typecheck
-npm run build
-```
+These constraints are now part of the architecture, not just visual polish.
 
-`typecheck` runs:
+## 22. Suggested contributor reading order
 
-```bash
-tsc --noEmit
-```
+1. `README.md`
+2. `CODE_WALKTHROUGH.md`
+3. `src/WorkspaceRoot.tsx`
+4. `src/App.tsx`
+5. `src/components/Phase2App.tsx`
+6. `src/core/keyboard.ts`
+7. `src/core/learning.ts`
+8. `src/core/metrics.ts`
+9. `src/data/lessons.ts`
+10. `src/components/Keyboard.tsx`
+11. `src/adapters/stats-adapter.ts`
+12. `src/styles.css`
+13. `src/review-fixes.css`
+14. `.github/workflows/ci.yml`
+15. `.github/workflows/pages.yml`
 
-This matters because Vite transpilation alone is not a substitute for a TypeScript type check.
-
-The Pages workflow repeats typecheck + production build before deployment so a broken `main` build cannot intentionally become the published artifact.
-
----
-
-## 17. Recommended next refactor
-
-The current single-file MVP is acceptable for initial validation, but Phase 2 should split responsibilities before Race Mode is added.
-
-Recommended direction:
-
-```text
-src/
-├── app/
-│   └── App.tsx
-├── features/
-│   ├── typing/
-│   │   ├── components/
-│   │   │   ├── TypingArea.tsx
-│   │   │   └── Keyboard.tsx
-│   │   ├── engine/
-│   │   │   ├── kedmanee.ts
-│   │   │   ├── typing-engine.ts
-│   │   │   └── metrics.ts
-│   │   └── types.ts
-│   ├── lessons/
-│   │   └── data/
-│   └── stats/
-├── adapters/
-└── main.tsx
-```
-
-The most important boundary to extract first is the **pure typing engine**. It should receive an expected character + physical key event and return a deterministic result without depending on React.
-
-That will make unit testing the difficult parts straightforward:
-
-- Kedmanee key mapping
-- Shift/tone marks
-- Natural mode
-- Forced correction mode
-- Backspace behavior
-- WPM/accuracy calculation
-- lesson completion
-
----
-
-## 18. Architecture direction after MVP
-
-The intended evolution is:
-
-```text
-                 ┌────────────────────┐
-                 │ React presentation │
-                 └─────────┬──────────┘
-                           │
-                 ┌─────────▼──────────┐
-                 │   Typing domain    │
-                 │ engine / lessons   │
-                 └─────────┬──────────┘
-                           │
-                 ┌─────────▼──────────┐
-                 │   StatsAdapter     │
-                 └──────┬────┬────────┘
-                        │    │
-          ┌─────────────┘    └──────────────┐
-          ▼                                  ▼
-   LocalStorage                         Cloud backend
-   MVP / offline                    Supabase or Firebase
-```
-
-Race Mode, leaderboards, login, classrooms, and adaptive learning should sit around this core rather than replacing it.
-
-The long-term value of PimDee is the Thai beginner-learning model—especially Kedmanee finger guidance, tone-mark training, weak-key analysis, and mixed TH/EN practice—not a particular backend provider.
-
----
-
-## 19. Suggested reading order for contributors
-
-Read the repository in this order:
-
-1. `README.md` — product purpose
-2. `CODE_WALKTHROUGH.md` — architecture and data flow
-3. `src/main.tsx` — current MVP implementation
-4. `src/adapters/stats-adapter.ts` — persistence boundary
-5. `src/adapters/local-adapter.ts` — current storage implementation
-6. `src/adapters/index.ts` — backend selection
-7. `src/styles.css` — responsive presentation
-8. `.github/workflows/ci.yml` — quality gate
-9. `.github/workflows/pages.yml` — production deployment
-10. `README-deploy.md` — deployment operations
-
-This sequence follows the application from product intent → domain behavior → persistence → presentation → delivery.
+This order follows the system from product surface -> typing behavior -> learning logic -> persistence -> presentation -> delivery.
